@@ -100,9 +100,21 @@ def handle_message(event):
             msg = format_summary(summary)
             reply_text(line_bot_api, event.reply_token, msg)
 
+        # คำสั่ง: พิมพ์ Status โดยตรง (รอ / กำลังผลิต / ตรวจสอบ / เสร็จ / ปัญหา)
+        elif text in ["รอ", "รอดำเนินการ", "waiting"]:
+            update_status_by_text(user_id, "waiting", line_bot_api, event.reply_token)
+        elif text in ["กำลังผลิต", "กำลังทำ", "เริ่ม", "in progress"]:
+            update_status_by_text(user_id, "in_progress", line_bot_api, event.reply_token)
+        elif text in ["ตรวจสอบ", "qc", "check"]:
+            update_status_by_text(user_id, "qc", line_bot_api, event.reply_token)
+        elif text in ["เสร็จ", "เสร็จสิ้น", "done", "complete"]:
+            update_status_by_text(user_id, "done", line_bot_api, event.reply_token)
+        elif text in ["ปัญหา", "มีปัญหา", "issue", "problem"]:
+            update_status_by_text(user_id, "issue", line_bot_api, event.reply_token)
+
         else:
             reply_text(line_bot_api, event.reply_token,
-                       "พิมพ์ 'งานวันนี้' เพื่อดูงานของคุณ\n'ดูงานวันนี้ทั้งหมด' เพื่อดูงานทุกคน\n'สรุป' เพื่อดูภาพรวม")
+                       "พิมพ์ 'งานวันนี้' เพื่อดูงานของคุณ\n'ดูงานวันนี้ทั้งหมด' เพื่อดูงานทุกคน\n'สรุป' เพื่อดูภาพรวม\n\nหรือพิมพ์ Status โดยตรง: รอ / กำลังผลิต / ตรวจสอบ / เสร็จ / ปัญหา")
 
 # ─── POSTBACK HANDLER (กดปุ่ม Status) ────────────────────────────
 @handler.add(PostbackEvent)
@@ -246,6 +258,48 @@ def format_summary(summary: dict) -> str:
         lines.append(f"{cfg['label']}: {count} รายการ")
     lines.append(f"\n📦 รวมทั้งหมด: {summary.get('total', 0)} รายการ")
     return "\n".join(lines)
+
+def update_status_by_text(user_id: str, new_status: str, api: MessagingApi, reply_token: str):
+    """อัพเดท Status ผ่านการพิมพ์ข้อความ"""
+    # ดึงงานของ user วันนี้
+    tasks = db_handler.get_tasks_for_user(user_id)
+    
+    if not tasks:
+        reply_text(api, reply_token, "ไม่พบงานที่ได้รับมอบหมายวันนี้ครับ")
+        return
+    
+    # ถ้ามีงานเดียว → อัพเดทเลย
+    if len(tasks) == 1:
+        batch_no = str(tasks[0].get("BATCH NO.", "")).split(".")[0]
+        success, task = db_handler.update_status(batch_no, new_status, user_id)
+        
+        if success:
+            status_label = STATUS_CONFIG[new_status]["label"]
+            msg = (f"✅ อัพเดทสำเร็จ!\n"
+                   f"Batch: {batch_no}\n"
+                   f"Status: {status_label}\n"
+                   f"เวลา: {datetime.now().strftime('%H:%M น.')}")
+            if new_status == "issue":
+                msg += "\n\nกรุณาพิมพ์รายละเอียดปัญหา เพื่อแจ้งหัวหน้าครับ"
+                db_handler.set_pending_issue(user_id, batch_no)
+        else:
+            msg = "❌ ไม่พบ Batch นี้ กรุณาตรวจสอบอีกครั้ง"
+        
+        reply_text(api, reply_token, msg)
+    
+    # ถ้ามีหลายงาน → ให้เลือกก่อน
+    else:
+        msg_lines = [f"คุณมี {len(tasks)} งานวันนี้ กรุณาพิมพ์เลข Batch ที่ต้องการอัพเดท:\n"]
+        for i, task in enumerate(tasks, 1):
+            batch_no = task.get("BATCH NO.", "-")
+            machine  = task.get("Machine", "-")
+            current_status = task.get("production_status", "waiting")
+            current_label  = STATUS_CONFIG.get(current_status, {}).get("label", current_status)
+            msg_lines.append(f"{i}. Batch {batch_no} | {machine} | {current_label}")
+        
+        msg_lines.append(f"\nจากนั้นพิมพ์ Status ใหม่อีกครั้ง")
+        reply_text(api, reply_token, "\n".join(msg_lines))
+        # TODO: บันทึก pending_status เพื่อรอ batch_no
 
 # ─── DAILY PUSH (เรียกจาก Scheduler) ─────────────────────────────
 def push_daily_tasks():
