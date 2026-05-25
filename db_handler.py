@@ -124,6 +124,21 @@ def get_all_assignments_today() -> dict[str, list]:
             result[uid] = tasks
     return result
 
+def get_all_tasks_today(target_date: str = None) -> list[dict]:
+    """ดึงงานทั้งหมดวันนี้ (ไม่กรองตาม user)"""
+    if target_date is None:
+        target_date = date.today().strftime("%Y-%m-%d")
+    
+    ss    = open_spreadsheet()
+    ws    = ss.worksheet(SHEET_PLAN)
+    rows  = ws.get_all_records()
+    tasks = []
+    for row in rows:
+        start_date = str(row.get("Start Date", ""))
+        if start_date == target_date:
+            tasks.append(row)
+    return tasks
+
 # ─── UPDATE STATUS ────────────────────────────────────────────────
 def update_status(batch_no: str, new_status: str, user_id: str,
                   issue_note: str = "") -> tuple[bool, Optional[dict]]:
