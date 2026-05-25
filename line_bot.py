@@ -72,6 +72,28 @@ def handle_message(event):
                 )
             )
 
+        # คำสั่ง: "ดูงานวันนี้ทั้งหมด" → ดูงานทุกคนวันนี้
+        elif text in ["ดูงานวันนี้ทั้งหมด", "งานทั้งหมด", "all tasks"]:
+            all_tasks = db_handler.get_all_tasks_today()
+            if not all_tasks:
+                reply_text(line_bot_api, event.reply_token,
+                           "ไม่พบงานวันนี้ครับ")
+                return
+            
+            # สร้างข้อความสรุป
+            msg_lines = [f"📋 งานวันนี้ทั้งหมด ({len(all_tasks)} รายการ)\n"]
+            for i, task in enumerate(all_tasks[:20], 1):  # แสดงสูงสุด 20 รายการ
+                batch_no = task.get("BATCH NO.", "-")
+                machine  = task.get("Machine", "-")
+                status   = task.get("production_status", "waiting")
+                status_label = STATUS_CONFIG.get(status, {}).get("label", status)
+                msg_lines.append(f"{i}. Batch {batch_no} | {machine} | {status_label}")
+            
+            if len(all_tasks) > 20:
+                msg_lines.append(f"\n...และอีก {len(all_tasks) - 20} รายการ")
+            
+            reply_text(line_bot_api, event.reply_token, "\n".join(msg_lines))
+
         # คำสั่ง: "สรุป" → ดู Dashboard
         elif text in ["สรุป", "summary", "dashboard"]:
             summary = db_handler.get_daily_summary()
@@ -80,7 +102,7 @@ def handle_message(event):
 
         else:
             reply_text(line_bot_api, event.reply_token,
-                       "พิมพ์ 'งานวันนี้' เพื่อดูงาน หรือ 'สรุป' เพื่อดูภาพรวมครับ")
+                       "พิมพ์ 'งานวันนี้' เพื่อดูงานของคุณ\n'ดูงานวันนี้ทั้งหมด' เพื่อดูงานทุกคน\n'สรุป' เพื่อดูภาพรวม")
 
 # ─── POSTBACK HANDLER (กดปุ่ม Status) ────────────────────────────
 @handler.add(PostbackEvent)
