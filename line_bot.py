@@ -100,21 +100,20 @@ def handle_message(event):
             msg = format_summary(summary)
             reply_text(line_bot_api, event.reply_token, msg)
 
-        # คำสั่ง: พิมพ์ Status โดยตรง (รอ / กำลังผลิต / ตรวจสอบ / เสร็จ / ปัญหา)
-        elif text in ["รอ", "รอดำเนินการ", "waiting"]:
-            update_status_by_text(user_id, "waiting", line_bot_api, event.reply_token)
-        elif text in ["กำลังผลิต", "กำลังทำ", "เริ่ม", "in progress"]:
-            update_status_by_text(user_id, "in_progress", line_bot_api, event.reply_token)
-        elif text in ["ตรวจสอบ", "qc", "check"]:
-            update_status_by_text(user_id, "qc", line_bot_api, event.reply_token)
-        elif text in ["เสร็จ", "เสร็จสิ้น", "done", "complete"]:
-            update_status_by_text(user_id, "done", line_bot_api, event.reply_token)
-        elif text in ["ปัญหา", "มีปัญหา", "issue", "problem"]:
-            update_status_by_text(user_id, "issue", line_bot_api, event.reply_token)
+        # คำสั่ง: พิมพ์ Batch Number เพื่ออัพเดท (เช่น "3976131026 กำลังผลิต")
+        elif any(status_word in text for status_word in ["รอ", "กำลังผลิต", "กำลังทำ", "เริ่ม", "ตรวจสอบ", "qc", "เสร็จ", "เสร็จสิ้น", "ปัญหา", "มีปัญหา", "waiting", "in progress", "done", "complete", "issue", "problem"]):
+            handle_batch_status_update(user_id, text, line_bot_api, event.reply_token)
 
         else:
             reply_text(line_bot_api, event.reply_token,
-                       "พิมพ์ 'งานวันนี้' เพื่อดูงานของคุณ\n'ดูงานวันนี้ทั้งหมด' เพื่อดูงานทุกคน\n'สรุป' เพื่อดูภาพรวม\n\nหรือพิมพ์ Status โดยตรง: รอ / กำลังผลิต / ตรวจสอบ / เสร็จ / ปัญหา")
+                       "📋 คำสั่งที่ใช้ได้:\n\n"
+                       "• 'งานวันนี้' - ดูงานของคุณ\n"
+                       "• 'ดูงานวันนี้ทั้งหมด' - ดูงานทุกคน\n"
+                       "• 'สรุป' - ดูภาพรวม\n\n"
+                       "🔄 อัพเดท Status:\n"
+                       "• พิมพ์ 'เลข Batch + Status'\n"
+                       "  ตัวอย่าง: 3976131026 กำลังผลิต\n\n"
+                       "Status ที่ใช้ได้: รอ / กำลังผลิต / ตรวจสอบ / เสร็จ / ปัญหา")
 
 # ─── POSTBACK HANDLER (กดปุ่ม Status) ────────────────────────────
 @handler.add(PostbackEvent)
